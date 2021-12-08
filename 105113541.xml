@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<annotation>
+	<folder>training</folder>
+	<filename>1CPJRr7Y64DRLp9sgS4VVw007.png</filename>
+	<source>
+		<database>synthetic initialization</database>
+		<annotation>PASCAL VOC2007</annotation>
+		<image>synthetic</image>
+		<flickrid>none</flickrid>
+	</source>
+	<owner>
+		<flickrid>none</flickrid>
+		<name>logo</name>
+	</owner>
+	<size>
+		<width>460</width>
+		<height>460</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>logo</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>130</xmin>
+			<ymin>154</ymin>
+			<xmax>223</xmax>
+			<ymax>201</ymax>
+		</bndbox>
+	</object>
+</annotation>

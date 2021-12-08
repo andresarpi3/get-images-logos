@@ -1,1 +1,7 @@
 output/
+.vscode/
+identical/
+reversed/
+images_with_xml/
+.DS_Store
+cache.npy

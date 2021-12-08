@@ -1,0 +1,36 @@
+item {
+	id: 1
+	name: 'General Motors'
+	count: 1
+}
+
+item {
+	id: 2
+	name: 'GMC'
+	count: 1
+}
+
+item {
+	id: 3
+	name: 'Philip Morris International'
+	count: 1
+}
+
+item {
+	id: 4
+	name: 'Walmart'
+	count: 8
+}
+
+item {
+	id: 5
+	name: 'General Electric'
+	count: 8
+}
+
+item {
+	id: 6
+	name: 'Natrona County High School'
+	count: 1
+}
+

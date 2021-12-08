@@ -5,12 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Download images",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "download_images.py",
             "console": "integratedTerminal",
             "args": ["5", "10"]
-        }
+        },
+
+        {
+            "name": "Create XML files",
+            "type": "python",
+            "request": "launch",
+            "program": "create_xml_files.py",
+            "console": "integratedTerminal",
+            "args": ["output", "images_with_xml"]
+        },
     ]
 }
