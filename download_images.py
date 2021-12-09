@@ -28,11 +28,15 @@ def download_image(in_):
     image_link, brand = in_
     brand_path = os.path.join(outpath, convert_to_brand_path(brand))
 
-    try:
-        raw_img = urllib.request.urlopen(image_link).read()
 
+    try:
         image_name = urllib.parse.urlsplit(image_link).path.split("/")[-1].split(".")[0]
         image_name = image_name[:min(12, len(image_name))] + ".jpg"
+
+        if os.path.isfile(os.path.join(brand_path, image_name)):
+            return
+
+        raw_img = urllib.request.urlopen(image_link).read()
 
         f = open(os.path.join(brand_path, image_name), 'wb')
         f.write(raw_img)
@@ -64,7 +68,7 @@ def download_brand(brand):
 
     images_links = sorted(list(images_links))[:limit_searches]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers = 2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers = limit_searches) as executor:
         executor.map(download_image, zip(images_links, [brand for x in range(len(images_links))]))
 
     downloaded_images = len(os.listdir(os.path.join(outpath, convert_to_brand_path(brand))))

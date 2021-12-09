@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "download_images.py",
             "console": "integratedTerminal",
-            "args": ["5", "10"]
+            "args": ["5", "1"]
         },
 
         {
