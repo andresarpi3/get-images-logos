@@ -9,6 +9,8 @@ import concurrent.futures
 from serpapi import GoogleSearch
 import datetime
 import sys
+from timeout import timeout
+import numpy as np
 
 params = {
   "api_key": "7f8127326245feb0a406ede628de5f9216511d1f1a8adf6bc80ed0bf4b97feee",
@@ -28,7 +30,6 @@ def download_image(in_):
     image_link, brand = in_
     brand_path = os.path.join(outpath, convert_to_brand_path(brand))
 
-
     try:
         image_name = urllib.parse.urlsplit(image_link).path.split("/")[-1].split(".")[0]
         image_name = image_name[:min(12, len(image_name))] + ".jpg"
@@ -42,15 +43,17 @@ def download_image(in_):
         f.write(raw_img)
         f.close()
     except Exception as e:
-        pass#print(f"Could not download {image_link}: {str(e)}.")
+        pass #print(f"Could not download {image_link}: {str(e)}.")
 
 
 
 def download_brand(brand):
+
     global limit_searches
     tqdm.tqdm.write(f"Starting {brand}")
     queries = [brand, f"{brand} logo", f"{brand} ad"]
 
+    # Get Images links
     images_links = set()
     for query in queries:
         param = params.copy()
@@ -65,11 +68,22 @@ def download_brand(brand):
             except:
                 pass
 
+    images_links = list(images_links)
+    np.random.shuffle(images_links)
+    images_links = images_links[:limit_searches]
+    ######
 
-    images_links = sorted(list(images_links))[:limit_searches]
+    ### Download Images links
+    @timeout(limit_searches * 2)
+    def download_images(limit_searches, images_links, brand):
+        with concurrent.futures.ThreadPoolExecutor(max_workers = limit_searches) as executor:
+            executor.map(download_image, zip(images_links, [brand for x in range(len(images_links))]))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers = limit_searches) as executor:
-        executor.map(download_image, zip(images_links, [brand for x in range(len(images_links))]))
+    try:
+        download_images(limit_searches, images_links, brand)
+    except Exception as e:
+        print(f"{brand} ran out of time...")
+    ####
 
     downloaded_images = len(os.listdir(os.path.join(outpath, convert_to_brand_path(brand))))
     tqdm.tqdm.write(f"{datetime.datetime.now()} - Brand {brand} ended downloading {downloaded_images} out of {len(images_links)}")
@@ -79,7 +93,11 @@ def download_all_brands(brands):
     for brand in tqdm.tqdm(brands):
         download_brand(brand)
 
+
+
+
 if __name__ == "__main__":
+    
 
     try:
         number_of_brands = int(sys.argv[1])
@@ -93,11 +111,14 @@ if __name__ == "__main__":
     outpath = "output"
     brands_df = pd.read_csv('1000-brands.csv')
     brands = brands_df["name"] #.str.replace(r'[^a-zA-Z]', '_', regex=True)
-    brands = brands[:]
+    brands = brands[:number_of_brands]
 
     os.makedirs(outpath, exist_ok=True)
     for brand in brands:
         os.makedirs(os.path.join(outpath, convert_to_brand_path(brand)), exist_ok=True)
 
+    np.random.shuffle(brands)
 
     download_all_brands(brands)
+
+
