@@ -90,10 +90,19 @@ def download_brand(brand):
 
 
 def download_all_brands(brands):
-    for brand in tqdm.tqdm(brands):
-        download_brand(brand)
+    global limit_searches
+    
+    max_time = 4 * len(brands) * limit_searches
 
+    @timeout(max_time)
+    def dms(brands):
+        for brand in tqdm.tqdm(brands):
+            download_brand(brand)
 
+    try:
+        dms(brands)
+    except:
+        print("Run took too long, starting another one...")
 
 
 if __name__ == "__main__":
@@ -119,6 +128,7 @@ if __name__ == "__main__":
 
     np.random.shuffle(brands)
 
-    download_all_brands(brands)
+    while (True):
+        download_all_brands(brands)
 
 
