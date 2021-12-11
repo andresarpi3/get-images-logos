@@ -93,8 +93,9 @@ def download_all_brands(brands):
     global limit_searches
     
     max_time = 4 * len(brands) * limit_searches
+    print(f"Max time is of {max_time}, but it's disabled.Run can take forever.")
 
-    @timeout(max_time)
+    #@timeout(max_time)
     def dms(brands):
         for brand in tqdm.tqdm(brands):
             download_brand(brand)
