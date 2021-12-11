@@ -12,6 +12,13 @@ import sys
 from timeout import timeout
 import numpy as np
 
+cache = None
+try:
+    cache = np.load(".cache.npy", allow_pickle=True).item()
+except Exception as e:
+    cache = {}
+
+
 params = {
   "api_key": "7f8127326245feb0a406ede628de5f9216511d1f1a8adf6bc80ed0bf4b97feee",
   "engine": "google",
@@ -49,7 +56,7 @@ def download_image(in_):
 
 def download_brand(brand):
 
-    global limit_searches
+    global limit_searches, cache
     tqdm.tqdm.write(f"Starting {brand}")
     queries = [brand, f"{brand} logo", f"{brand} ad"]
 
@@ -59,8 +66,13 @@ def download_brand(brand):
         param = params.copy()
         param["q"] = query
 
-        search = GoogleSearch(param)
-        results = search.get_dict()
+        if query in cache:
+            results = cache[query]
+        else:
+            search = GoogleSearch(param)
+            results = search.get_dict()
+            cache[query] = results
+            np.save(".cache.npy", cache)
 
         for result in results['images_results']:
             try:

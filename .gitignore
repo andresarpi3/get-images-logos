@@ -5,3 +5,4 @@ reversed/
 images_with_xml/
 .DS_Store
 cache.npy
+__pycache__/
