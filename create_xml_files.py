@@ -10,6 +10,7 @@ import pprint
 import xml.dom.minidom as md
 import glob
 import re
+import concurrent.futures
 
 
 
@@ -67,7 +68,7 @@ def get_iou(bb1, bb2):
     return iou
 
 
-def filter_logos(logos, thresh=0.70):
+def filter_logos(logos, thresh=0.50):
     new_logos = []
     logos = sorted(logos, key=lambda x: -x['score'])
 
@@ -151,9 +152,93 @@ def detect_logos(path, h, w, transform_coord_fn):
                 response.error.message))
 
     cache[path] = logos
-    np.save("cache.npy", cache)
+    np.save(".cache_logos.npy", cache)
     return logos
 
+def process_image(image_path):
+    _, brand, image_name = image_path.split("/")
+
+    img = cv2.imread(image_path)
+    try:
+        height, width = img.shape[:2]
+    except:
+        return
+
+    logos = []
+
+    for fn_name, fn, transform_coord in zip(fns_names, fns, coord_transform_fn):
+        new_img = fn(img)
+        new_path = fn_name + '_' + image_name
+        cv2.imwrite(new_path, new_img)
+
+        try:
+            logos += detect_logos(new_path, height, width, transform_coord)
+        except Exception as e:
+            print(f"Image '{image_path}' couldn't be processed: '{e}'")
+
+        os.system(f"rm {new_path}")
+
+    logos = [l for l in logos if l['score'] > 0.80]
+
+    if len(logos) == 0:
+        #os.remove(image_path)
+        return
+
+    logos = filter_logos(logos)
+
+    root = md.parse('105113541.xml')
+    objects = root.getElementsByTagName("object")
+    for node in objects:
+        parent = node.parentNode
+        parent.removeChild(node)
+
+    root.getElementsByTagName('filename')[0].firstChild.data = image_path
+    root.getElementsByTagName('height')[0].firstChild.data = height
+    root.getElementsByTagName('width')[0].firstChild.data = width
+
+    for logo in logos:
+        new_node = node.cloneNode(deep=True)
+
+        new_node.getElementsByTagName("truncated")[0].firstChild.data = str(logo["score"] * 100)
+        new_node.getElementsByTagName("name")[0].firstChild.data = logo["brand"]
+        if logo["brand"] not in label_map:
+            label_map[logo["brand"]] = 0
+        label_map[logo["brand"]] += 1
+
+        y0, x0, y1, x1 = (
+            logo['coords'] * np.array([height, width, height, width])).astype("int")
+
+        new_node.getElementsByTagName("xmin")[0].firstChild.data = x0
+        new_node.getElementsByTagName("ymin")[0].firstChild.data = y0
+        new_node.getElementsByTagName("xmax")[0].firstChild.data = x1
+        new_node.getElementsByTagName("ymax")[0].firstChild.data = y1
+
+        root.childNodes[0].appendChild(new_node)
+
+    xml_str = root.toprettyxml() 
+    xml_str = re.sub(r'\n[\s]*\n', '\n', xml_str)
+    save_path_file = outfolder + '/' + image_name.split(".")[0] + ".xml"
+    with open(save_path_file, "w") as f:
+        f.write(xml_str) 
+
+    os.system(f"ln {image_path} {outfolder}/{image_name}")
+
+    """
+    if debug:
+
+        img = tf.convert_to_tensor(
+            np.expand_dims(img, 0) / 255, dtype="float32")
+        boxes = tf.convert_to_tensor(np.expand_dims(
+            np.array([l['coords'] for l in logos]), 0), dtype=tf.float32)
+        colors = tf.convert_to_tensor(
+            [[0.0, 0.0, 1.0] for x in enumerate(logos)], dtype=tf.float32)
+
+        drawn = tf.image.draw_bounding_boxes(img, boxes, colors)
+        drawn = (drawn.numpy() * 255).astype("uint8")[0]
+
+        showimage(drawn)
+
+    """
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/andresarpi/.ssh/gcloud-keys.json'
 
@@ -163,7 +248,7 @@ INPATH = "popular_logos_plain"
 client = vision.ImageAnnotatorClient()
 
 try:
-    cache = np.load('cache.npy', allow_pickle='TRUE').item()
+    cache = np.load('.cache_logos.npy', allow_pickle='TRUE').item()
 except:
     print("Couldn't load cache.")
     cache = {}
@@ -194,87 +279,12 @@ if __name__ == "__main__":
     debug = False
 
     label_map = {}
-    for image_path in present_images:
-        _, brand, image_name = image_path.split("/")
+    #for image_path in present_images:
+     #   process_image(image_path)
 
-        img = cv2.imread(image_path)
-        try:
-            height, width = img.shape[:2]
-        except:
-            continue
+    with concurrent.futures.ThreadPoolExecutor(max_workers = 8) as executor:
+        executor.map(process_image, present_images)
 
-        logos = []
-
-        for fn_name, fn, transform_coord in zip(fns_names, fns, coord_transform_fn):
-            new_img = fn(img)
-            new_path = fn_name + '_' + image_name
-            cv2.imwrite(new_path, new_img)
-
-            try:
-                logos += detect_logos(new_path, height, width, transform_coord)
-            except Exception as e:
-                print(f"Image '{image_path}' couldn't be processed: '{e}'")
-
-            os.system(f"rm {new_path}")
-
-        logos = [l for l in logos if l['score'] > 0.80]
-
-        if len(logos) == 0:
-            #os.remove(image_path)
-            continue
-
-        logos = filter_logos(logos)
-
-        root = md.parse('105113541.xml')
-        objects = root.getElementsByTagName("object")
-        for node in objects:
-            parent = node.parentNode
-            parent.removeChild(node)
-
-        root.getElementsByTagName('filename')[0].firstChild.data = image_path
-        root.getElementsByTagName('height')[0].firstChild.data = height
-        root.getElementsByTagName('width')[0].firstChild.data = width
-
-        for logo in logos:
-            new_node = node.cloneNode(deep=True)
-
-            new_node.getElementsByTagName("truncated")[0].firstChild.data = str(logo["score"] * 100)
-            new_node.getElementsByTagName("name")[0].firstChild.data = logo["brand"]
-            if logo["brand"] not in label_map:
-                label_map[logo["brand"]] = 0
-            label_map[logo["brand"]] += 1
-
-            y0, x0, y1, x1 = (
-                logo['coords'] * np.array([height, width, height, width])).astype("int")
-
-            new_node.getElementsByTagName("xmin")[0].firstChild.data = x0
-            new_node.getElementsByTagName("ymin")[0].firstChild.data = y0
-            new_node.getElementsByTagName("xmax")[0].firstChild.data = x1
-            new_node.getElementsByTagName("ymax")[0].firstChild.data = y1
-
-            root.childNodes[0].appendChild(new_node)
-
-        xml_str = root.toprettyxml() 
-        xml_str = re.sub(r'\n[\s]*\n', '\n', xml_str)
-        save_path_file = outfolder + '/' + image_name.split(".")[0] + ".xml"
-        with open(save_path_file, "w") as f:
-            f.write(xml_str) 
-
-        os.system(f"ln {image_path} {outfolder}/{image_name}")
-
-        if debug:
-
-            img = tf.convert_to_tensor(
-                np.expand_dims(img, 0) / 255, dtype="float32")
-            boxes = tf.convert_to_tensor(np.expand_dims(
-                np.array([l['coords'] for l in logos]), 0), dtype=tf.float32)
-            colors = tf.convert_to_tensor(
-                [[0.0, 0.0, 1.0] for x in enumerate(logos)], dtype=tf.float32)
-
-            drawn = tf.image.draw_bounding_boxes(img, boxes, colors)
-            drawn = (drawn.numpy() * 255).astype("uint8")[0]
-
-            showimage(drawn)
 
     with open("label_map.pbtxt", "w") as text_file:
         for i, (brand, count) in enumerate(label_map.items()):
