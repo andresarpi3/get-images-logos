@@ -5,7 +5,6 @@ import numpy as np
 import cv2
 import sys
 import pandas as pd
-import tensorflow as tf
 import pprint
 import xml.dom.minidom as md
 import glob
@@ -217,11 +216,14 @@ def process_image(image_path):
 
     xml_str = root.toprettyxml() 
     xml_str = re.sub(r'\n[\s]*\n', '\n', xml_str)
-    save_path_file = outfolder + '/' + image_name.split(".")[0] + ".xml"
-    with open(save_path_file, "w") as f:
-        f.write(xml_str) 
+    save_path_file = outfolder + '/' + brand.replace(" ", "") + "_" + image_name.split(".")[0] + ".xml"
+    try:
+        with open(save_path_file, "w") as f:
+            f.write(xml_str) 
+    except Exception as e:
+        print(e)
 
-    os.system(f"ln {image_path} {outfolder}/{image_name}")
+    os.system(f"ln {image_path} {outfolder}/{brand.replace(' ', '')}_{image_name}")
 
     """
     if debug:
