@@ -10,8 +10,9 @@ import xml.dom.minidom as md
 import glob
 import re
 import concurrent.futures
+from difflib import SequenceMatcher
 
-
+brands: list = None
 
 
 def get_iou(bb1, bb2):
@@ -154,6 +155,20 @@ def detect_logos(path, h, w, transform_coord_fn):
     np.save(".cache_logos.npy", cache)
     return logos
 
+
+def find_best_brand(logo_brand):
+    def similar(a, b):
+        return SequenceMatcher(None, a, b).ratio()
+
+    global brands
+    results = []
+    for br in brands:
+        results.append((br, similar(br, logo_brand)))
+
+    results = sorted(results, key = lambda x : -x[1])
+    print(f"'{logo_brand}' was assigned '{results[0][0]}' with {results[0][1]:.2f} score")
+    return results[0]
+
 def process_image(image_path):
     _, brand, image_name = image_path.split("/")
 
@@ -199,7 +214,11 @@ def process_image(image_path):
         new_node = node.cloneNode(deep=True)
 
         new_node.getElementsByTagName("truncated")[0].firstChild.data = str(logo["score"] * 100)
-        new_node.getElementsByTagName("name")[0].firstChild.data = logo["brand"]
+        best_match_brand, score = find_best_brand(logo["brand"])
+        if score < 0.6:
+            continue
+
+        new_node.getElementsByTagName("name")[0].firstChild.data = best_match_brand
         if logo["brand"] not in label_map:
             label_map[logo["brand"]] = 0
         label_map[logo["brand"]] += 1
@@ -227,18 +246,20 @@ def process_image(image_path):
 
     """
     if debug:
+        try:
+            img = tf.convert_to_tensor(
+                np.expand_dims(img, 0) / 255, dtype="float32")
+            boxes = tf.convert_to_tensor(np.expand_dims(
+                np.array([l['coords'] for l in logos]), 0), dtype=tf.float32)
+            colors = tf.convert_to_tensor(
+                [[0.0, 0.0, 1.0] for x in enumerate(logos)], dtype=tf.float32)
 
-        img = tf.convert_to_tensor(
-            np.expand_dims(img, 0) / 255, dtype="float32")
-        boxes = tf.convert_to_tensor(np.expand_dims(
-            np.array([l['coords'] for l in logos]), 0), dtype=tf.float32)
-        colors = tf.convert_to_tensor(
-            [[0.0, 0.0, 1.0] for x in enumerate(logos)], dtype=tf.float32)
+            drawn = tf.image.draw_bounding_boxes(img, boxes, colors) if len(logos) else img
+            drawn = (drawn.numpy() * 255).astype("uint8")[0]
 
-        drawn = tf.image.draw_bounding_boxes(img, boxes, colors)
-        drawn = (drawn.numpy() * 255).astype("uint8")[0]
-
-        showimage(drawn)
+            showimage(drawn)
+        except Exception as e:
+            print(e)
 
     """
 
@@ -267,6 +288,7 @@ if __name__ == "__main__":
 
     os.makedirs(outfolder, exist_ok=True)
 
+    brands = os.listdir(images_folder)
     present_images = glob.glob(f"{images_folder}/*/*", recursive = True)
     present_images = [pi for pi in present_images if pi.split(".")[-1] in ["jpg", "jpeg", "png"]]
 

@@ -82,6 +82,12 @@ def download_brand(brand):
 
     images_links = list(images_links)
     np.random.shuffle(images_links)
+
+    downloaded_images = len(os.listdir(os.path.join(outpath, convert_to_brand_path(brand))))
+    limit_searches = limit_searches - downloaded_images
+    if limit_searches <= 0:
+        return
+
     images_links = images_links[:limit_searches]
     ######
 
@@ -122,7 +128,7 @@ def download_all_brands(brands):
 
 
 if __name__ == "__main__":
-    
+
 
     try:
         number_of_brands = int(sys.argv[1])
@@ -131,12 +137,13 @@ if __name__ == "__main__":
         print("Call the script with 'python download_images.py [number of brands] [number of image per brand]")
         exit()
 
-    print(f"Will download at most {limit_searches} for {number_of_brands} brands")
 
     outpath = "output"
     brands_df = pd.read_csv('1000-brands.csv')
     brands = brands_df["name"] #.str.replace(r'[^a-zA-Z]', '_', regex=True)
     brands = brands[:number_of_brands]
+
+    print(f"Will download at most {limit_searches} for {len(brands)} brands")
 
     os.makedirs(outpath, exist_ok=True)
     for brand in brands:
